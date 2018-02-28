@@ -1,25 +1,31 @@
 # -*- coding:utf-8 -*-
-# vim:ts=4:sw=4:sts=4:et:ai:ff=unix:fenc=utf-8
-
-"""Base class for quantum executor
-
+"""definition of BaseQuantumExecutor class
 """
 from abc import abstractmethod
 
 import sympy
 from qiskit.qasm._qasmparser import QasmParser
 
-
 class BaseQuantumExecutor:
+    """BaseQuantumExecutor Class
+    """
     def __init__(self):
+        """Initial method. No implements.  
+        """
         pass
 
     @abstractmethod
     def execute(self, circuit, **options):
+        """Abstract method.
+        @return: None
+        """
         return None
 
-    def to_qasm(self, sympy_expr):
-        """
+    def to_qasm(self, sympy_expr, with_measure=False):
+        """QuantumExecutor classes' commom method.
+        Transform SymPy expression to OpenQASM format descriptions.
+
+        @return qasm format string.
         """
         qasm = 'OPENQASM 2.0;\ninclude "qelib1.inc";\n'
         assert isinstance(sympy_expr, sympy.mul.Mul), 'Sorry. Now, supported U*U*U*Qubit format'
@@ -50,8 +56,43 @@ class BaseQuantumExecutor:
                 qasm += 'cx qr[{}], qr[{}];\n'.format(int(gate.args[0]), int(gate.args[1]))
                 qasm += 'cx qr[{}], qr[{}];\n'.format(int(gate.args[1]), int(gate.args[0]))
                 qasm += 'cx qr[{}], qr[{}];\n'.format(int(gate.args[0]), int(gate.args[1]))
+            elif isinstance(gate, sympy.physics.quantum.gate.CGate):
+                if isinstance(gate.args[1], sympy.physics.quantum.gate.IdentityGate):
+                    continue
+                t = gate.args[1].args[0]
+                if isinstance(gate.args[1], sympy.physics.quantum.gate.XGate):
+                    qasm += 'cx qr[{}], qr[{}];\n'.format(tuple(gate.args[0])[0], t)
+                elif isinstance(gate.args[1], sympy.physics.quantum.gate.YGate):
+                    qasm += 'sdg qr[{}];\n'.format(t)
+                    qasm += 'cx qr[{}], qr[{}];\n'.format(tuple(gate.args[0])[0], t)
+                    qasm += 's qr[{}];\n'.format(t)
+                elif isinstance(gate.args[1], sympy.physics.quantum.gate.ZGate):
+                    qasm += 'h qr[{}];\n'.format(t)
+                    qasm += 'cx qr[{}], qr[{}];\n'.format(tuple(gate.args[0])[0], t)
+                    qasm += 'h qr[{}];\n'.format(t)
+                elif isinstance(gate, sympy.physics.quantum.gate.HadamardGate):
+                    qasm += 'sdg qr[{}];\n'.format(t)
+                    qasm += 'h qr[{}];\n'.format(t)
+                    qasm += 'tdg qr[{}];\n'.format(t)
+                    qasm += 'cx qr[{}], qr[{}];\n'.format(tuple(gate.args[0])[0], t)
+                    qasm += 't qr[{}];\n'.format(t)
+                    qasm += 'h qr[{}];\n'.format(t)
+                    qasm += 's qr[{}];\n'.format(t)
+                elif isinstance(gate.args[1], sympy.physics.quantum.gate.PhaseGate):
+                    c = tuple(gate.args[0])[0]
+                    qasm += 't qr[{}];\n'.format(t)
+                    qasm += 'cx qr[{}], qr[{}];\n'.format(c, t)
+                    qasm += 'tdg qr[{}];\n'.format(t)
+                    qasm += 'cx qr[{}], qr[{}];\n'.format(c, t)
+                    qasm += 't qr[{}];\n'.format(c)
+                elif isinstance(gate.args[1], sympy.physics.quantum.gate.TGate):
+                    c = tuple(gate.args[0])[0]
+                    qasm += 'cu1(pi/4) qr[{}], qr[{}];\n'.format(c, t)
+                else:
+                    assert False, '{} it is not a gate operator, nor is a supported operator'.format(repr(gate))
             else:
-                assert False, '{}はゲートじゃないか、対応してないゲートです'.format(repr(gate))
-        for i in range(len(qubit)):
-            qasm += 'measure qr[{0}] -> cr[{0}];\n'.format(i)
+                assert False, '{} it is not a gate operator, nor is a supported operator'.format(repr(gate))
+        if with_measure:
+            for i in range(len(qubit)):
+                qasm += 'measure qr[{0}] -> cr[{0}];\n'.format(i)
         return qasm

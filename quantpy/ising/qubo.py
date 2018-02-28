@@ -1,13 +1,12 @@
 # -*- coding:utf-8 -*-
-# vim:ts=4:sw=4:sts=4:et:ai:ff=unix:fenc=utf-8
-
-"""
+"""Utilities of QUBO matrix 
 """
 
-#get ising matrix from qubo
 import numpy as np
 
 def getMat(qubo):
+    """Return array([h,J,Jsum+hsum])
+    """
     N = len(qubo)
     h = []
     J = [[0]*N for i in range(N)]
